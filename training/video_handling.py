@@ -57,7 +57,17 @@ model = YOLO("yolov8n.pt")
 def run_detection(frame):
     raw_result = model(frame)[0]
     plotted_frame = raw_result.plot()
-    return plotted_frame
+
+    detections = []
+    for box in raw_result.boxes:
+        detections.append({
+            "label": raw_result.names[int(box.cls)],
+            "confidence": float(box.conf),
+            "bbox": box.xyxy[0].tolist()
+        })
+
+
+    return plotted_frame, detections
 
 
 
