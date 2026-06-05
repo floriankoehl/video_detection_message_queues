@@ -13,6 +13,7 @@
 
 
 import cv2
+from ultralytics import YOLO
 
 
 def extract_metadata(video):
@@ -22,8 +23,6 @@ def extract_metadata(video):
         "height": int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)),
         "total_frames": video.get(cv2.CAP_PROP_FRAME_COUNT)
     }
-
-
 
 def extract_frames(video):
     frames = []
@@ -35,9 +34,6 @@ def extract_frames(video):
         frames.append(frame)
     
     return frames
-
-
-
 
 def extract_video_data(video_path: str) -> list:
     video = cv2.VideoCapture(video_path)
@@ -56,6 +52,20 @@ def extract_video_data(video_path: str) -> list:
 
 
 
+model = YOLO("yolov8n.pt")
+
+def run_detection(frame):
+    raw_result = model(frame)[0]
+    plotted_frame = raw_result.plot()
+    return plotted_frame
+
+
+
+
+
+
+
+
 
 def reconstruct_video(frames, output_path, fps, width, height):
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -67,9 +77,22 @@ def reconstruct_video(frames, output_path, fps, width, height):
     output.release()
 
 
+
+
+
+
+
+
+
 def pipeline(video_path, output_path):
     video = extract_video_data(video_path)
-    reconstruct_video(frames=video["frames"], 
+
+    processed_frames = []
+    for frame in video["frames"]:
+        plotted_frame = run_detection(frame)
+        processed_frames.append(plotted_frame)
+
+    reconstruct_video(frames=processed_frames, 
                       output_path=output_path, 
                       fps=video["data"]["fps"], 
                       width=video["data"]["width"], 
