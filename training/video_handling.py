@@ -1,0 +1,84 @@
+
+# Write a function extract_frames(video_path) that:
+
+# Opens data/video2.mp4
+# Extracts all frames into a list
+# Prints total frame count, fps, width and height
+# Returns (frames, fps, width, height)
+
+# Then write a second function reconstruct_video(frames, output_path, fps, width, height) 
+# that takes that list of frames and writes them back to a new video file unchanged. 
+# Verify the output video is playable.
+
+
+
+import cv2
+
+
+def extract_metadata(video):
+    return {
+        "fps": video.get(cv2.CAP_PROP_FPS),
+        "width": int(video.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        "height": int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        "total_frames": video.get(cv2.CAP_PROP_FRAME_COUNT)
+    }
+
+
+
+def extract_frames(video):
+    frames = []
+    while True: 
+        is_read, frame = video.read()
+        if not is_read:
+            print("Video ended")
+            break
+        frames.append(frame)
+    
+    return frames
+
+
+
+
+def extract_video_data(video_path: str) -> list:
+    video = cv2.VideoCapture(video_path)
+    if not video.isOpened():
+        print("could not open video")
+
+    video_data = extract_metadata(video)
+    frames = extract_frames(video)
+    
+    video.release()
+
+    return {
+        "frames": frames, 
+        "data": video_data
+    }
+
+
+
+
+def reconstruct_video(frames, output_path, fps, width, height):
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    output = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    for frame in frames: 
+        output.write(frame)
+    
+    output.release()
+
+
+def pipeline(video_path, output_path):
+    video = extract_video_data(video_path)
+    reconstruct_video(frames=video["frames"], 
+                      output_path=output_path, 
+                      fps=video["data"]["fps"], 
+                      width=video["data"]["width"], 
+                      height=video["data"]["height"])
+
+
+
+pipeline("../data/video2.mp4", "../output_tests/reconstructed_video.mp4")
+
+
+
+
