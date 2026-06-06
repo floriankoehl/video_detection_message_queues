@@ -1,0 +1,4 @@
+{ 
+    "max_size": 50, 
+    "persistence_interval": 5
+}
