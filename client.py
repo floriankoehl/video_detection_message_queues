@@ -8,6 +8,11 @@ URL = f"http://localhost:{PORT}"
 
 
 
+
+
+
+
+
 def push_to_transactions(message):
     response = requests.post(f"{URL}/queues/transactions/messages", json=message).json()
     print(response)

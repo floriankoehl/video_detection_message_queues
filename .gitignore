@@ -1,3 +1,5 @@
 .venv
-data
+data/
 output_tests/
+output/
+__pycache__/

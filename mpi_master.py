@@ -18,6 +18,33 @@ size = comm.Get_size()
 model = YOLO("yolov8n.pt")
 
 
+
+
+# ----------------------------
+# Initalize Queue
+# ----------------------------
+def create_transaction_queue():
+    response = requests.post(f"{URL}/queues/transactions").json()
+    print(response)
+
+def create_result_queue():
+    response = requests.post(f"{URL}/queues/results").json()
+    print(response)
+
+def initalize_queue():
+    create_transaction_queue()
+    create_result_queue()
+
+
+
+
+
+
+
+
+
+
+
 # ----------------------------
 # Process video
 # ----------------------------
@@ -89,10 +116,12 @@ def flatten_frames_from_chunks(chunks):
 # MPI PART
 # ----------------------------
 
+
+initalize_queue()
 while True: 
 
 
-    # Poll Jobs
+    # Pop Jobs
     if rank == 0: 
         response = requests.get(f"{URL}/queues/transactions/messages")
         if response.status_code == 200: 
@@ -100,7 +129,6 @@ while True:
             print(job)
         else: 
             job = None
-            continue
     else: 
         job = None
 
@@ -112,11 +140,9 @@ while True:
 
 
 
-
-
-    
+    # Define Jobs
     if rank == 0: 
-        frames, video_data = extract_video_data("data/video2.mp4")
+        frames, video_data = extract_video_data(job["video"])
         chunks = np.array_split(frames, size)
 
     else: 
@@ -148,11 +174,25 @@ while True:
         all_frames = flatten_frames_from_chunks(all_frames_chunks)
         reconstruct_video(
             frames=all_frames,
-            output_path="output/plotted_video.mp4",
+            output_path=f"output/result_{job['job_id']}.mp4",
             fps=video_data["fps"],
             width=video_data["width"],
             height=video_data["height"]
         )
+
+
+        response = requests.post(f"{URL}/queues/results/messages",
+                                 json={
+                                     "job_id": job["job_id"],
+                                     "output_video": f"output/result_{job['job_id']}.mp4"
+                                 })
+
+
+        if response.status_code == 200: 
+            print("sucesfully returned result!")
+        else: 
+            print("Something went wrong when pushing to the queue")
+
 
 
 
