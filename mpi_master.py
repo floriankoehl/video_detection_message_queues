@@ -3,7 +3,19 @@ import cv2
 from ultralytics import YOLO
 from mpi4py import MPI
 import numpy as np
+import os
+import requests
+import time
 
+
+PORT = 8000
+URL = f"http://localhost:{PORT}"
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
+model = YOLO("yolov8n.pt")
 
 
 # ----------------------------
@@ -40,11 +52,13 @@ def extract_video_data(video_path: str) -> list:
 
     return frames, video_data
 
+def reconstruct_video(frames, output_path, fps, width, height):
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    output = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-# ----------------------------
-# Yolo Part
-# ----------------------------
-model = YOLO("yolov8n.pt")
+    for frame in frames: 
+        output.write(frame)
+    output.release()
 
 def run_detection(frame):
     raw_result = model(frame)[0]
@@ -65,81 +79,104 @@ def run_detection(frame):
 
     return plotted_result, detections
 
-
+def flatten_frames_from_chunks(chunks):
+    all_frames = []
+    for chunk in chunks:
+        all_frames.extend(chunk)
+    return all_frames
 
 # ----------------------------
 # MPI PART
 # ----------------------------
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+
+while True: 
 
 
-if rank == 0: 
-    print(f"I am the master")
-    frames, video_data = extract_video_data("../data/video2.mp4")
-    chunks = np.array_split(frames, size)
+    # Poll Jobs
+    if rank == 0: 
+        response = requests.get(f"{URL}/queues/transactions/messages")
+        if response.status_code == 200: 
+            job = response.json()
+            print(job)
+        else: 
+            job = None
+            continue
+    else: 
+        job = None
 
-else: 
-    chunks = None
-    video_data = None
+    job = comm.bcast(job, root=0)
 
-# Video data broadcast for now not necessary but could be useful later
-video_data = comm.bcast(video_data, root=0)
-jobs = comm.scatter(chunks, root=0)
-
-
-
-
-import os
-
-os.makedirs(f"../output_tests/worker_{rank}", exist_ok=True)
-
-results = []
-for i, job in enumerate(jobs): 
-    plottet_frame, detections = run_detection(job)
-    cv2.imwrite(f"../output_tests/worker_{rank}/frame_{i}.jpg", plottet_frame)
-    results.append(plottet_frame)
-
-
-
-all_frames_chunks = comm.gather(results, root=0)
-
-
-def reconstruct_video(frames, output_path, fps, width, height):
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    output = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-    for frame in frames: 
-        output.write(frame)
-    output.release()
-
-
-
-
-if rank == 0: 
-    all_frames = []
-    for chunk in all_frames_chunks:
-        all_frames.extend(chunk)
-
-
-    reconstruct_video(
-        frames=all_frames,
-        output_path="../output_tests/reconstructed_video.mp4",
-        fps=video_data["fps"],
-        width=video_data["width"],
-        height=video_data["height"]
-    )
+    if job is None:
+        time.sleep(1)
+        continue
 
 
 
 
 
+    
+    if rank == 0: 
+        frames, video_data = extract_video_data("data/video2.mp4")
+        chunks = np.array_split(frames, size)
+
+    else: 
+        chunks = None
+        video_data = None
+
+
+
+    # Scatter the Data
+    frames = comm.scatter(chunks, root=0)
+
+
+
+    # Run the computation
+    os.makedirs(f"output/worker_{rank}", exist_ok=True)
+    results = []
+    for i, frame in enumerate(frames): 
+        plottet_frame, detections = run_detection(frame)
+        cv2.imwrite(f"output/worker_{rank}/frame_{i}.jpg", plottet_frame)
+        results.append(plottet_frame)
+
+
+    # Gather the results
+    all_frames_chunks = comm.gather(results, root=0)
+
+
+    # Reconstruct the video
+    if rank == 0: 
+        all_frames = flatten_frames_from_chunks(all_frames_chunks)
+        reconstruct_video(
+            frames=all_frames,
+            output_path="output/plotted_video.mp4",
+            fps=video_data["fps"],
+            width=video_data["width"],
+            height=video_data["height"]
+        )
 
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# while True: 
+#         job = requests.get(f"{URL}/queues/transactions/messages")
+#         print("Received job: ", job)
 
 
