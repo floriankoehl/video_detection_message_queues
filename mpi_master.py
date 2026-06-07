@@ -117,8 +117,11 @@ def flatten_frames_from_chunks(chunks):
 # ----------------------------
 
 
-initalize_queue()
-while True: 
+if rank == 0:
+    initalize_queue()
+comm.barrier()
+
+while True:
 
 
     # Pop Jobs

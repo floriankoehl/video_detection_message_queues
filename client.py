@@ -39,11 +39,13 @@ if __name__ == "__main__":
     message = build_message(1, "data/video2.mp4")
     push_to_transactions(message)
 
-    while True: 
+    while True:
         try:
             result = pop_from_results()
-            print("sucesfully received the result!!!")
-        except Exception as e: 
+            if result:
+                print("sucesfully received the result!!!")
+                break
+        except Exception as e:
             print(str(e))
             break
 
